@@ -8,7 +8,8 @@ static int last_client_index = 0;
 int main()
 {
     for(int i=0; i<MAX_TOPICS; i++){
-        topics[0].size_of_clients = 0;
+        topics[i].size_of_clients = 0;
+        printf("%d \n", topics[i].size_of_clients);
     }
 
     int queue_id = msgget(QUEUE_ID, IPC_CREAT | 0666);
@@ -22,10 +23,12 @@ int main()
         MessageBuffer message_buffer;
         size_t size = sizeof(MessageBuffer) - sizeof(long);
         int bytes_count = msgrcv(queue_id, &message_buffer, size, 0, 0);
+        printf("%s\n", message_buffer.message);
         if(bytes_count == -1){
             printf("%s\n", strerror(errno));
             return -1;
         }
+        printf("Odebrałem bajtow %d, a powiino byc tyle %d\n", bytes_count, size);
         long mtype = message_buffer.mtype;
         if(mtype == REGISTER){
             log_in_client(message_buffer);
@@ -34,10 +37,31 @@ int main()
             register_new_topic(message_buffer);
         }
         else if(mtype == SUBSCRIBE){
-            subscribe_topic(message_buffer);
+            for(int j=0; j<MAX_TOPICS;j++){
+                topics[j].size_of_clients = 0;
+                printf("%d \n", topics[j].size_of_clients);
+            }
+            for(int i = 0; i<=count_topics; i++){
+                 //if(strcmp(topics[i].topic.topic_name, message_buffer.message) == 0){}
+                 int index = topics[i].size_of_clients;
+                 printf("%d\n", index);
+                 printf("%d\n", i);
+                 printf("%d\n", count_topics);
+                 printf("%d\n", MAX_TOPICS);
+                 printf("\n");
+                 
+
+            //  topics[i].clients[index] = message_buffer.client_data;
+            // topics[i].clients[topics[i].size_of_clients].private_queue_key = message_buffer.client_data;
+            // topics[i].clients[topics[i].size_of_clients].name = message_buffer.client_data;
+            // topics[i].size_of_clients += 1;
+            // printf("Client %s subscribed topic %s\n", message_buffer.client_data.name, message_buffer.message);
+            
+            
+            }    
         }
         else if(mtype == RETURN_TOPICS){
-            send_available_topics(message_buffer);
+            send_available_topics(queue_id);
         }
         else if(mtype > NEW_TOPIC){
             register_new_message(message_buffer);
@@ -80,7 +104,6 @@ int register_new_topic(MessageBuffer message_buffer){
     topic.mtype =  NEW_TOPIC + 1 + count_topics;
     strcpy(topic.topic_name ,message_buffer.message);
     data.topic = topic;
-    ClientData clients[MAX_SUBCRIBERS];
     
     topics[count_topics] = data;
     count_topics += 1;
@@ -90,7 +113,7 @@ int register_new_topic(MessageBuffer message_buffer){
 }
 
 int subscribe_topic(MessageBuffer message_buffer){
-    printf("czy tu sie co dzieje\n");
+    
     for(int i = 0; i<=count_topics; i++){
         if(strcmp(topics[i].topic.topic_name, message_buffer.message) == 0){
             topics[i].clients[topics[i].size_of_clients] = message_buffer.client_data;
