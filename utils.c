@@ -15,3 +15,4 @@ char vchar()
 void print_error(){
 	printf("%s\n", strerror(errno));
 }
+

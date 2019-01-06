@@ -59,4 +59,5 @@ typedef struct SendTopic{
 
 
 char vchar();
+
 void print_error();

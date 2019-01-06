@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/msg.h>
 #include <stdlib.h>
+#include <string.h>
 #include "utils.h"
 
 
@@ -27,4 +28,14 @@ typedef struct TopicWithClients{
  */
 int search_client(ClientData client);
 
+int log_in_client(MessageBuffer message_buffer);
 
+int register_new_topic(MessageBuffer message_buffer);
+
+int subscribe_topic(MessageBuffer message_buffer);
+
+int register_new_message(MessageBuffer message_buffer);
+
+int send_message_to_clients(MessageBuffer message_received);
+
+int send_available_topics(int queue_id);
