@@ -5,15 +5,15 @@
 
 
 static ClientData my_client_data;
-static char topics_names[MAX_TOPICS];
-
+static Topic topics[MAX_TOPICS];
+static int topics_size = 0 ;
 
 
 int main()
 {   
     int server_queue_id = msgget(QUEUE_ID, 0666);
     if(server_queue_id == -1){
-        printf("%s\n", strerror(errno));
+        perror("");
         return 0;
     }
     size_t path_size = 50;
@@ -21,38 +21,46 @@ int main()
     getcwd(current_path, path_size);
 
     pid_t process_id = getpid();
-    strcpy(my_client_data.name, "Mateusz");
+    printf("Podaj swoja nazwe\n");
+    scanf("%s", my_client_data.name);
+
     my_client_data.proces_id = process_id;
 
     key_t key = ftok(current_path, my_client_data.proces_id);
     my_client_data.private_queue_key = key;
-
+    
     int client_queue_id = msgget(key, IPC_CREAT | 0666);
     if(client_queue_id == -1){
-        printf("%s\n", strerror(errno));
+        perror("");
         return 0;
     }
 
-    printf("Tu pogram klienta\n");
+
+    send_login(server_queue_id);
+    
+
     do{
         char option;
-        char* menu = "a - Zarejesturj sie\ns - Dodaj nowy temat\nd - Wyślij nową wiadomosć\nf - Zasubskrybuj temat\n";
+        char* menu = "\nq - Odbierz wiadomosc\ns - Dodaj nowy temat\n\
+d - Wyślij nową wiadomosć\nf - Zasubskrybuj temat\n";
         printf("Wybierz opcje programu\n%s", menu);
         option = vchar();
         switch(option){
-            case 'a':
-                send_login(server_queue_id);
-                break;
-            case 's':
-                register_topic(server_queue_id);
-                break;
-            case 'd':
-                send_new_message(server_queue_id);
-                
+            case 'q':
                 receive_messages(client_queue_id);
                 break;
+            case 'a':
+                break;
+            case 's':
+                add_new_topic(server_queue_id, client_queue_id);
+    
+                break;
+            case 'd':    
+                send_new_message(server_queue_id);
+                
+                break;
             case 'f':
-                subscribe_topic(server_queue_id);
+                subscribe_topic(server_queue_id, client_queue_id);
                 break;
             case 'z':
                 break; 
@@ -68,10 +76,7 @@ int main()
 }
 
 int send_login(int queue_id){
-    printf("Rejestracja\n");
-    
-   
-   
+    printf("Rejestruja sie u servera\n");
 
     MessageBuffer message_buffer;
     size_t size_of_client_data = sizeof(my_client_data) + sizeof(message_buffer.message);
@@ -82,7 +87,7 @@ int send_login(int queue_id){
 
     int did_send = msgsnd(queue_id, &message_buffer, size_of_client_data, 0);
     if(did_send == -1){
-        perror("Ola");
+        print_error();
 
         return -1;
     }
@@ -90,9 +95,18 @@ int send_login(int queue_id){
     return 1;
 }
 
-void register_topic(int queue_id){
+
+void add_new_topic(int server_queue_id, int client_queue_id){
+    char topic_name[MAX_SIZE_OF_NAME];
+    printf("Podaj nazwe tematu ktory chcesz zarejestrowac: ");
+    scanf("%s", topic_name);
+    register_topic(server_queue_id, topic_name);
+    did_register_topic(client_queue_id, topic_name);
+}
+
+
+void register_topic(int queue_id, char topic_name[]){
     
-    char topic_name[MAX_SIZE_OF_NAME] = "Wiadomosci";
     MessageBuffer message_buffer;
     message_buffer.client_data = my_client_data;
     message_buffer.mtype = NEW_TOPIC;
@@ -100,57 +114,181 @@ void register_topic(int queue_id){
     int size = sizeof(message_buffer) - sizeof(long);
     int did_send = msgsnd(queue_id, &message_buffer, size, 0);
     if(did_send == -1){
-       printf("%s\n", strerror(errno));
+       perror("");
     }
 }
+
+void did_register_topic(int queue_id, char topic_name[]){
+
+    MessageBuffer message_buffer;
+    message_buffer.mtype = NEW_TOPIC;
+    int size = sizeof(message_buffer) - sizeof(long);
+    int did_register = msgrcv(queue_id, &message_buffer, size, NEW_TOPIC, 0);
+    
+    
+    if(did_register == -1){
+       printf("%s\n", strerror(errno));
+    }
+    else{
+        if( strcmp(message_buffer.message, "OK")  == 0){
+            printf("Udało sie zarejestrowac temat %s\n", message_buffer.message);
+        }else{
+            printf("Podany temat istnieje na liscie tematów\n");
+        }
+    }
+}
+
 
 void send_new_message(int queue_id){
     MessageBuffer message_buffer;
     message_buffer.client_data = my_client_data;
-    message_buffer.mtype = NEW_TOPIC+1;
-    strcpy(message_buffer.message, "Trump zdominowal swiat!");
-    int size = sizeof(message_buffer) - sizeof(long);
+    
+    message_buffer.mtype = choose_topic();
+
+    printf("Podaj tresc wiadomosci\n");
+    fgets(message_buffer.message, SIZE_OF_MESSAGE, stdin);
+    
+    char c;
+    int i =0;
+    
+    fgets(message_buffer.message, SIZE_OF_MESSAGE, stdin);
+    
+    size_t size = sizeof(MessageBuffer) - sizeof(long);
     int did_send = msgsnd(queue_id, &message_buffer, size, 0);
     if(did_send == -1){
        print_error();
     }else{
-        printf("Wyslalem wiadomosc %s\n",message_buffer.message );
+        printf("Wyslalem wiadomosc dla tematu %ld o tresci %s\n",message_buffer.mtype, message_buffer.message );
     }
 }
 
 
-void get_aveiable_topics(int queue_id){
+
+int request_and_get_aveiable_topics(int server_id, int client_id, Topic aveiable_topics[]){
+    request_aveiable_topics(server_id);
+    int topic_size = get_aveiable_topics(client_id, aveiable_topics);
+    if(topic_size == -1){
+        return -1;
+    }
+    return topic_size;
+    
+}
+
+void request_aveiable_topics(int quque_id){
     MessageBuffer message_buffer;
     message_buffer.client_data = my_client_data;
     message_buffer.mtype = GET_TOPICS;
     int size = sizeof(message_buffer) - sizeof(long);
-    int did_send = msgsnd(queue_id, &message_buffer, size, 0);
+    int did_send = msgsnd(quque_id, &message_buffer, size, 0);
     if(did_send == -1){
-       printf("%s \n", strerror(errno));
+        printf("%s \n", strerror(errno));
+        return;
     }
 }
 
-void subscribe_topic(int queue_id){
-    MessageBuffer message_buffer;
-    message_buffer.client_data = my_client_data;
-    message_buffer.mtype = SUBSCRIBE;
-    strcpy(message_buffer.message, "Wiadomosci");
+int get_aveiable_topics(int client_id, Topic topics[]){
+    SendTopic message_buffer;
+    message_buffer.mtype = GET_TOPICS;
     int size = sizeof(message_buffer) - sizeof(long);
-    int did_send = msgsnd(queue_id, &message_buffer, size, 0);
+    int did_send = msgrcv(client_id, &message_buffer, size, GET_TOPICS, 0);
     if(did_send == -1){
-       printf("%s \n", strerror(errno));
+        printf("%s \n", strerror(errno));
+        return -1;
     }
+    for(int i=0; i<message_buffer.acutal_topics_size; i++){
+        topics[i] = message_buffer.available_topics[i];
+    }
+    return message_buffer.acutal_topics_size;
 }
+
+void subscribe_topic(int server_queue_id, int client_queue_id){
+    Topic aveiable_topics[MAX_TOPICS];
+    int aviable_topics_size = request_and_get_aveiable_topics(server_queue_id, client_queue_id, aveiable_topics);
+    char option;
+    do{ 
+        for(int i=0; i<aviable_topics_size; i++){
+            printf("%d - %s\n", i, aveiable_topics[i].topic_name);
+        }
+        printf("Podaj temat który chcesz zaskubskrybować lub 'z' jeśli chcesz wyjsc\n");
+        option = vchar();
+        if(option == 'z'){
+            break;
+        }
+        int index = option - '0';
+        MessageBuffer message_buffer;
+        message_buffer.client_data = my_client_data;
+        message_buffer.mtype = SUBSCRIBE;
+        strcpy(message_buffer.message, aveiable_topics[index].topic_name);
+        int size = sizeof(MessageBuffer) - sizeof(long);
+        int did_send = msgsnd(server_queue_id, &message_buffer, size, 0);
+    
+        if(did_send == -1){
+            perror("");
+        }
+        topics[topics_size] = aveiable_topics[index];
+        topics_size++;
+        
+    }while(option != 'z');
+}
+
+
 
 void receive_messages(int client_queue_id){
-    SimpleMessageBuffer message_bufferer;
-  
-    size_t size = sizeof(SimpleMessageBuffer) - sizeof(long);
-    int did_receive = msgrcv(client_queue_id, &message_bufferer, size, NEW_TOPIC+1, IPC_NOWAIT);
-    if(did_receive == -1){
-        printf("%s\n", strerror(errno)); 
-    }else{
-        printf("Dostales wiadomosc\n");
-        printf("%s\n", message_bufferer.message);
+
+    //TODO Doing
+    for(int i=0; i<topics_size; i++){
+        int next_topic = 0;
+        while(next_topic != 1){
+            SimpleMessageBuffer message_bufferer;
+            size_t size = sizeof(SimpleMessageBuffer) - sizeof(long);
+            int did_receive = msgrcv(client_queue_id, &message_bufferer, size, NEW_TOPIC+1, IPC_NOWAIT);
+            if(did_receive == -1){
+                // perror("");
+                next_topic = 1;
+            }else{
+                printf("Dostales wiadomosc z tematu\n");
+                printf("%s\n", message_bufferer.message);
+            }
+        } 
     }
+}
+
+long choose_topic(){
+    char option;
+    int int_option;
+    do{
+        
+        for(int i=0; i<topics_size; i++){
+            printf("%d. %s\n", i+1, topics[i].topic_name);
+        }
+        printf("Wybierz temat dla ktorego chcesz oglosic wiadomosc\n");
+        
+
+        option = vchar();
+        if(option == 'z'){
+            return -1;
+        }
+        int_option = option - '0';
+        int_option --;
+        
+    }while( !(int_option >= 0 && int_option <= topics_size) );
+    long mtype = topics[int_option].mtype;
+    return mtype;
+}
+
+int find_topic_by_mtype(long mtype){
+    for(int i=0; i<topics_size; i++){
+        if(topics[i].mtype == mtype){
+            return i;
+        }
+    }
+    return -1;
+}
+int find_topic_by_name(char name[]){
+    for(int i=0; i<topics_size; i++){
+        if(strcmp(topics[i].topic_name, name) == 0){
+            return i;
+        }
+    }
+    return -1;
 }

@@ -6,7 +6,10 @@
 #define REGISTER 1
 #define GET_TOPICS 2
 #define RETURN_TOPICS 3
+
 #define SUBSCRIBE 4
+
+#define ERORR_MESSAGE 6
 #define NEW_TOPIC 7
 
 

@@ -1,7 +1,7 @@
 #include "server.h"
 
 static TopicWithClients topics[MAX_TOPICS];
-static int count_topics = 0;
+static int topics_size = 0;
 static ClientData clients[MAX_CLIENTS];
 static int last_client_index = 0;
 
@@ -10,7 +10,7 @@ int main()
 	
 	int queue_id = msgget(QUEUE_ID, IPC_CREAT | 0666);
 	if(queue_id == -1){
-		printf("%s\n", strerror(errno));
+		perror("");
 		return 0;
 	}
 
@@ -20,7 +20,7 @@ int main()
 		size_t size = sizeof(MessageBuffer) - sizeof(long);
 		int did_receive = msgrcv(queue_id, &message_buffer, size, 0, 0);
 		if(did_receive == -1){
-			printf("%s\n", strerror(errno));
+			perror("");
 			return -1;
 		}
 
@@ -32,12 +32,11 @@ int main()
 			register_new_topic(message_buffer);
 		}
 		else if(mtype == SUBSCRIBE){
-			subscribe_topic(message_buffer);
-			
-			  
+			subscribe_topic(message_buffer);	  
 		}
-		else if(mtype == RETURN_TOPICS){
-			send_available_topics(queue_id);
+		
+		else if(mtype == GET_TOPICS){
+			send_available_topics(message_buffer.client_data.private_queue_key);
 		}
 		else if(mtype > NEW_TOPIC){
 			register_new_message(message_buffer);
@@ -74,23 +73,36 @@ int search_client(ClientData client){
 
 int register_new_topic(MessageBuffer message_buffer){
 	
-	printf("I Registerd new topic %s\n", message_buffer.message);
+	
 	TopicWithClients data;
 	Topic topic;
-	topic.mtype =  NEW_TOPIC + 1 + count_topics;
+	topic.mtype =  NEW_TOPIC + 1 + topics_size;
 	strcpy(topic.topic_name ,message_buffer.message);
-	data.topic = topic;
-	data.size_of_clients = 0;
-	topics[count_topics] = data;
-	count_topics += 1;
+	if( find_topic_by_name(topic.topic_name) == -1){
+		data.topic = topic;
+		data.size_of_clients = 0;
+		topics[topics_size] = data;
+		topics_size += 1;
+		int client_queue_id = msgget(message_buffer.client_data.private_queue_key, 0666);
 
-	return 1;
-	
+		SimpleMessageBuffer confirm_new_topic;
+		strcpy(confirm_new_topic.message,"OK");
+		confirm_new_topic.mtype = NEW_TOPIC;
+		size_t size = sizeof(confirm_new_topic) - sizeof(long);
+		printf("I registerd new topic %s\n", message_buffer.message);
+		msgsnd(client_queue_id, &confirm_new_topic, size, IPC_NOWAIT);
+		return 1;
+	}
+	return -1;
 }
+
+
+
+
 
 int subscribe_topic(MessageBuffer message_buffer){
    
-	for(int i = 0; i<=count_topics; i++){
+	for(int i = 0; i<=topics_size; i++){
 		if(strcmp(topics[i].topic.topic_name, message_buffer.message) == 0){
 			int index= topics[i].size_of_clients;
 			topics[i].clients[index] = message_buffer.client_data;
@@ -134,19 +146,38 @@ int send_message_to_clients(MessageBuffer message_received){
 	
 }
 
-int send_available_topics(int queue_id){
+int send_available_topics(key_t client_key){
 	SendTopic message_buffer;
-	message_buffer.mtype = RETURN_TOPICS;
-	for(int i=0; i<count_topics; i++){
+	message_buffer.mtype = GET_TOPICS;
+	for(int i=0; i<topics_size; i++){
 		message_buffer.available_topics[i] = topics[i].topic;
 
 	}
-	message_buffer.acutal_topics_size = count_topics;
-	size_t size = sizeof(message_buffer) - sizeof(long);
-	int did_send = msgsnd(queue_id, &message_buffer, size, 0);
+	message_buffer.acutal_topics_size = topics_size;
+	size_t size = sizeof(SendTopic) - sizeof(long);
+	int client_quque_id = msgget(client_key, 0666);
+	int did_send = msgsnd(client_quque_id, &message_buffer, size, 0);
 	if(did_send == -1){
 		printf("%s\n", strerror(errno));
+		return -1;
 	}
+	return 1;
 }
 
 
+int find_topic_by_mtype(long mtype){
+    for(int i=0; i<topics_size; i++){
+        if(topics[i].topic.mtype == mtype){
+            return i;
+        }
+    }
+    return -1;
+}
+int find_topic_by_name(char name[]){
+    for(int i=0; i<topics_size; i++){
+        if(strcmp(topics[i].topic.topic_name, name) == 0){
+            return i;
+        }
+    }
+    return -1;
+}

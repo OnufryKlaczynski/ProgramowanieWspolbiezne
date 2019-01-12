@@ -38,4 +38,7 @@ int register_new_message(MessageBuffer message_buffer);
 
 int send_message_to_clients(MessageBuffer message_received);
 
-int send_available_topics(int queue_id);
+int send_available_topics(key_t client_key);
+
+int find_topic_by_name(char name[]);
+int find_topic_by_mtype(long mtype);
