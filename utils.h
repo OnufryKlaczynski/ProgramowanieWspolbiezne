@@ -38,6 +38,7 @@ typedef struct ClientData{
 typedef struct MessageBuffer{
     long mtype;
     char message[SIZE_OF_MESSAGE];
+    int notify;
     ClientData client_data;
 
 }MessageBuffer;
@@ -51,6 +52,7 @@ typedef struct SimpleMessageBuffer{
 typedef struct Topic{
     char topic_name[MAX_SIZE_OF_NAME];
     long mtype;
+    int notify;
 }Topic;
 
 

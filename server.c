@@ -63,7 +63,7 @@ int log_in_client(MessageBuffer message_buffer){
 
 int search_client(ClientData client){
 	size_t size = sizeof(clients)/sizeof(ClientData);
-	for(int i=0; i<size; i++){
+	for(size_t i=0; i<size; i++){
 		if( strcmp(clients[0].name, client.name) == 0){
 			return i;
 		}
@@ -117,29 +117,29 @@ int subscribe_topic(MessageBuffer message_buffer){
 
 int register_new_message(MessageBuffer message_buffer){
 	
-	printf("I Registerd new message %s\nfrom topic %ld\n", message_buffer.message, message_buffer.mtype);
+	printf("I registerd new message %s", message_buffer.message, message_buffer.mtype);
 	return 1;
 }
 
 int send_message_to_clients(MessageBuffer message_received){
-	printf("I send message to clients %s\n", message_received.message);
+	printf("I sent message %s to clients\n", message_received.message);
 	int index = message_received.mtype - (NEW_TOPIC +1);
 	int size_of_clients = topics[index].size_of_clients;
 	SimpleMessageBuffer message_to_send;
 	message_to_send.mtype = message_received.mtype;
 	int size = sizeof(SimpleMessageBuffer) - sizeof(long);
-	printf("%d halo\n", size);
+	
 
 	strcpy(message_to_send.message, message_received.message);
 	for(int i=0; i<size_of_clients;i++){
-		
+		if(strcmp(clients[i].name, message_received.client_data.name) == 0){
+			continue;
+		}
 		int queue_id = msgget(topics[index].clients[i].private_queue_key, 0666);
 		int did_send = msgsnd(queue_id, &message_to_send, size, IPC_NOWAIT);
 		if(did_send == -1){
 			print_error();
 			return -1;
-		}else{
-			printf("I Sended message\n");
 		}
 	}
 	return 1;
