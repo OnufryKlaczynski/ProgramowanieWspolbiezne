@@ -259,7 +259,7 @@ void subscribe_topic(int server_queue_id, int client_queue_id){
     do{ 
         int j=0;
         for(int i=0; i<aviable_topics_size; i++){
-            if(already_subscribing_topic(aveiable_topics[i].topic_name) == -1){
+            if( already_subscribing_topic(aveiable_topics[i].topic_name) == -1){
                 printf("%d - %s\n", j, aveiable_topics[i].topic_name);
                 i_to_j[j] = i;
                 j++;
@@ -323,8 +323,10 @@ int already_subscribing_topic(char* name){
 
 
 void receive_messages(int client_queue_id){
+    
     long mtype;
     do{
+
         mtype = choose_topic_for_reading_messages();
         if(mtype == -1){
             return;
@@ -333,11 +335,11 @@ void receive_messages(int client_queue_id){
         SimpleMessageBuffer message_bufferer;
         size_t size = sizeof(SimpleMessageBuffer) - sizeof(long);
         int did_receive = msgrcv(client_queue_id, &message_bufferer, size, mtype, IPC_NOWAIT);
+        system("clear");
         if(did_receive == -1){
             perror("");
             
         }else{
-    
             printf("%s\n", message_bufferer.message);  
         }
 
@@ -347,7 +349,7 @@ void receive_messages(int client_queue_id){
 
 
 long choose_topic_for_reading_messages(){
-    system("clear");
+    
     char option;
     int int_option;
     if(topics_size == 0){
@@ -378,9 +380,11 @@ long choose_topic_for_reading_messages(){
         int_option = option - '0';
         int_option --;
         unread_topics[int_option] = 0;
+        
     }while( !(int_option >= 0 && int_option <= topics_size) );
     long mtype = topics[int_option].mtype;
     return mtype;
+    
 }
 
 

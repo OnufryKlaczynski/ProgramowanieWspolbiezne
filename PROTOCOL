@@ -1,0 +1,7 @@
+Program server tworzy koleję komunikatów do rozmawiania z klientami. Jest ona znana dla każdego programu klienta.
+
+Program klienta rejestruje swoja nazwę w programie servera rozgłaszając ją przez 
+kolejkę stworzną przez server. Wysyła mu także zmienną typu key_t zwróconą przez funkcję ftok(). Klient tworzy własna kolejkę podając parametr key_t.
+
+Klient wysyła żądania do servera kolejką servera, server zawsze odpowiada klientowi prywatną kolejką klienta.  
+
